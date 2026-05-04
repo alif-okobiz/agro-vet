@@ -3,19 +3,38 @@ import React, { useState } from 'react';
 import { 
   ShieldCheck, CalendarCheck, ClipboardList, X, Camera, 
   Stethoscope, Users, HeartPulse, Microscope, 
-  ArrowRight, Activity, Phone, Trash2
+  ArrowRight, Activity, Phone, Trash2, Loader2
 } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast'; // Toast import
 
 const LivestockService = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    ownerName: '',
+    phone: '',
+    species: 'Cattle / Cow',
+    age: '',
+    breed: '',
+    details: ''
+  });
 
   const toggleModal = () => {
     setIsModalOpen(!isModalOpen);
-    setSelectedImage(null); // Reset image when closing
+    setSelectedImage(null);
+    if (!isModalOpen) {
+      setFormData({ ownerName: '', phone: '', species: 'Cattle / Cow', age: '', breed: '', details: '' });
+    }
   };
 
-  // Handle Image Preview
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const reader = new FileReader();
@@ -26,8 +45,47 @@ const LivestockService = () => {
 
   const removeImage = () => setSelectedImage(null);
 
+  // --- SUBMIT LOGIC ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const loadingToast = toast.loading('Sending your request...');
+
+    // আপনার ব্যাকেন্ডে species এবং category রিকোয়ার্ড। 
+    // তাই details কে details হিসেবেই পাঠাচ্ছি এবং category হিসেবে 'Medical' সেট করছি।
+    const payload = {
+      ...formData,
+      category: "Medical Support", 
+      image: selectedImage || null // ইমেজ থাকলে যাবে
+    };
+
+    try {
+      const response = await fetch('/api/livestock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success('Ticket created successfully!', { id: loadingToast });
+        toggleModal(); // Close modal on success
+      } else {
+        toast.error(result.error || 'Submission failed', { id: loadingToast });
+      }
+    } catch (error) {
+      console.error("Submit Error:", error);
+      toast.error('Network error! Please check your connection.', { id: loadingToast });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="bg-white min-h-screen text-slate-900">
+      <Toaster position="top-center" reverseOrder={false} />
       
       {/* 1. HERO SECTION */}
       <section className="relative pt-20 pb-32 overflow-hidden bg-slate-50">
@@ -41,21 +99,19 @@ const LivestockService = () => {
               Professional Care for Your <span className="text-emerald-700">Valuable Assets.</span>
             </h1>
             <p className="text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl">
-              We provide science-backed solutions for farm management, nutrition, and disease control. Our goal is to transform your livestock venture into a sustainable success.
+              We provide science-backed solutions for farm management, nutrition, and disease control.
             </p>
-            <div className="flex flex-wrap gap-5">
-              <button 
-                onClick={toggleModal}
-                className="bg-emerald-700 text-white px-10 py-5 rounded-2xl font-bold hover:bg-emerald-800 transition-all shadow-xl shadow-emerald-700/30 flex items-center gap-3 active:scale-95"
-              >
-                <CalendarCheck size={20} /> Open Support Ticket
-              </button>
-            </div>
+            <button 
+              onClick={toggleModal}
+              className="bg-emerald-700 text-white px-10 py-5 rounded-2xl font-bold hover:bg-emerald-800 transition-all shadow-xl shadow-emerald-700/30 flex items-center gap-3 active:scale-95"
+            >
+              <CalendarCheck size={20} /> Open Support Ticket
+            </button>
           </div>
         </div>
       </section>
 
-      {/* 2. SERVICES GRID */}
+      {/* 2. SERVICES GRID (Keeping your design as is) */}
       <section className="py-24 max-w-7xl mx-auto px-6 -mt-16 relative z-20">
         <div className="grid md:grid-cols-3 gap-8">
           {[
@@ -69,9 +125,6 @@ const LivestockService = () => {
               </div>
               <h3 className="text-2xl font-bold mb-4 text-slate-900">{service.title}</h3>
               <p className="text-slate-500 leading-relaxed mb-6">{service.desc}</p>
-              <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
-                Learn Policy <ArrowRight size={16} />
-              </div>
             </div>
           ))}
         </div>
@@ -93,28 +146,43 @@ const LivestockService = () => {
               </button>
             </div>
 
-            <form className="px-10 py-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar" onSubmit={(e) => e.preventDefault()}>
+            <form className="px-10 py-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar" onSubmit={handleSubmit}>
               
-              {/* Contact Info */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Owner Name</label>
-                  <input required type="text" placeholder="Full Name" className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium placeholder:text-slate-400 transition-all" />
+                  <input 
+                    name="ownerName"
+                    value={formData.ownerName}
+                    onChange={handleInputChange}
+                    required type="text" placeholder="Full Name" 
+                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium transition-all" 
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Phone Number</label>
                   <div className="relative">
-                    <Phone className="absolute left-4 top-4.5 w-4 h-4 text-slate-400" />
-                    <input required type="tel" placeholder="017XX XXXXXX" className="w-full pl-12 pr-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium transition-all" />
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required type="tel" placeholder="017XX XXXXXX" 
+                      className="w-full pl-12 pr-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium transition-all" 
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Livestock Details */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Animal Species</label>
-                  <select className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white text-slate-900 font-medium">
+                  <select 
+                    name="species"
+                    value={formData.species}
+                    onChange={handleInputChange}
+                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium"
+                  >
                     <option>Cattle / Cow</option>
                     <option>Poultry / Chicken</option>
                     <option>Goat / Sheep</option>
@@ -124,51 +192,62 @@ const LivestockService = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Age</label>
-                    <input type="text" placeholder="e.g. 2 yrs" className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" />
+                    <input 
+                      name="age"
+                      value={formData.age}
+                      onChange={handleInputChange}
+                      type="text" placeholder="2 (months)" 
+                      className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" 
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Breed</label>
-                    <input type="text" placeholder="Holstein" className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" />
+                    <input 
+                      name="breed"
+                      value={formData.breed}
+                      onChange={handleInputChange}
+                      type="text" placeholder="Holstein" 
+                      className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 font-medium" 
+                    />
                   </div>
                 </div>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase mb-2 block tracking-wider">Problem Details</label>
-                <textarea required rows="3" placeholder="Describe symptoms or current situation in detail..." className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-slate-900 font-medium" />
+                <textarea 
+                  name="details"
+                  value={formData.details}
+                  onChange={handleInputChange}
+                  required rows="3" placeholder="Describe symptoms..." 
+                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-slate-900 font-medium" 
+                />
               </div>
 
-              {/* Image Preview System */}
               <div className="space-y-4">
                 <label className="text-xs font-bold text-slate-600 uppercase block tracking-wider">Visual Evidence (Optional)</label>
-                
                 {!selectedImage ? (
-                  <div className="border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center hover:bg-slate-50 cursor-pointer group transition-all relative">
+                  <div className="border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center hover:bg-slate-50 cursor-pointer relative transition-all">
                     <input type="file" accept="image/*" id="file-up" className="hidden" onChange={handleImageChange} />
                     <label htmlFor="file-up" className="cursor-pointer flex flex-col items-center">
-                      <Camera className="w-10 h-10 text-slate-300 group-hover:text-emerald-600 transition-colors mb-3" />
+                      <Camera className="w-10 h-10 text-slate-300 mb-3" />
                       <p className="text-sm font-bold text-slate-500">Select Image from PC</p>
-                      <p className="text-xs text-slate-400 mt-1">High quality photos help our experts</p>
                     </label>
                   </div>
                 ) : (
-                  <div className="relative rounded-3xl overflow-hidden border border-slate-200 bg-slate-50 p-2 group">
+                  <div className="relative rounded-3xl overflow-hidden border border-slate-200 p-2">
                     <img src={selectedImage} alt="Preview" className="w-full h-48 object-cover rounded-2xl" />
-                    <button 
-                      onClick={removeImage}
-                      className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-all transform hover:scale-110"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                    <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-lg">
-                      Selected Photo Preview
-                    </div>
+                    <button onClick={removeImage} className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full"><Trash2 size={18} /></button>
                   </div>
                 )}
               </div>
 
-              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl active:scale-95 text-lg">
-                Submit Consultation Ticket
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl active:scale-95 text-lg disabled:opacity-70 flex items-center justify-center gap-3"
+              >
+                {isSubmitting ? <><Loader2 className="animate-spin" /> Submitting...</> : "Submit Consultation Ticket"}
               </button>
             </form>
           </div>
